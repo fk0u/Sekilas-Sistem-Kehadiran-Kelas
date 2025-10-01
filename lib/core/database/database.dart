@@ -207,6 +207,17 @@ class AppDatabase extends _$AppDatabase {
   Future<int> deleteSetting(String key) {
     return (delete(appSettings)..where((t) => t.key.equals(key))).go();
   }
+
+  // Parent methods
+  Future<Parent?> getParent() => select(parents).getSingleOrNull();
+
+  // Watch methods for streams
+  Stream<List<Permission>> watchPermissionsByParent(int parentId) {
+    return (select(permissions)
+      ..where((t) => t.parentId.equals(parentId))
+      ..orderBy([(t) => OrderingTerm.desc(t.id)]))
+      .watch();
+  }
 }
 
 LazyDatabase _openConnection() {
