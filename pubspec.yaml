@@ -41,14 +41,17 @@ dependencies:
   fl_chart: ^0.66.0
   intl: ^0.19.0
   
+  # Routing
+  go_router: ^13.0.0
+  
   # Security
   flutter_secure_storage: ^9.0.0
   
   # Share
   share_plus: ^7.2.1
   
-  # File Picker
-  file_picker: ^6.1.1
+  # File Picker (disabled temporarily due to build issues)
+  # file_picker: ^6.1.1
 
 dev_dependencies:
   flutter_test:
@@ -67,13 +70,15 @@ flutter:
     - assets/images/
     - assets/icons/
   
-  fonts:
-    - family: Poppins
-      fonts:
-        - asset: assets/fonts/Poppins-Regular.ttf
-        - asset: assets/fonts/Poppins-Medium.ttf
-          weight: 500
-        - asset: assets/fonts/Poppins-SemiBold.ttf
-          weight: 600
-        - asset: assets/fonts/Poppins-Bold.ttf
-          weight: 700
+  # Font Poppins akan otomatis di-download oleh google_fonts package
+  # Uncomment section di bawah jika ingin menggunakan font lokal:
+  # fonts:
+  #   - family: Poppins
+  #     fonts:
+  #       - asset: assets/fonts/Poppins-Regular.ttf
+  #       - asset: assets/fonts/Poppins-Medium.ttf
+  #         weight: 500
+  #       - asset: assets/fonts/Poppins-SemiBold.ttf
+  #         weight: 600
+  #       - asset: assets/fonts/Poppins-Bold.ttf
+  #         weight: 700

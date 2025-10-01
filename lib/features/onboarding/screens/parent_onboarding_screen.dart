@@ -4,48 +4,82 @@ import 'package:go_router/go_router.dart';
 import '../../../core/database/database.dart';
 import '../../../core/theme/app_theme.dart';
 
-class TeacherOnboardingScreen extends ConsumerStatefulWidget {
-  const TeacherOnboardingScreen({super.key});
+class ParentOnboardingScreen extends ConsumerStatefulWidget {
+  const ParentOnboardingScreen({super.key});
 
   @override
-  ConsumerState<TeacherOnboardingScreen> createState() => _TeacherOnboardingScreenState();
+  ConsumerState<ParentOnboardingScreen> createState() => _ParentOnboardingScreenState();
 }
 
-class _TeacherOnboardingScreenState extends ConsumerState<TeacherOnboardingScreen> {
+class _ParentOnboardingScreenState extends ConsumerState<ParentOnboardingScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
+  final _parentNameController = TextEditingController();
   final _classController = TextEditingController();
+  String? _selectedStudentId;
+  List<Student> _students = [];
   bool _isLoading = false;
 
   @override
+  void initState() {
+    super.initState();
+    _loadStudents();
+  }
+
+  @override
   void dispose() {
-    _nameController.dispose();
+    _parentNameController.dispose();
     _classController.dispose();
     super.dispose();
   }
 
+  Future<void> _loadStudents() async {
+    final database = ref.read(appDatabaseProvider);
+    final students = await database.getAllStudents();
+    setState(() {
+      _students = students;
+    });
+  }
+
+  Future<void> _loadStudentsByClass(String className) async {
+    final database = ref.read(appDatabaseProvider);
+    final students = await database.getStudentsByClass(className);
+    setState(() {
+      _students = students;
+      _selectedStudentId = null;
+    });
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_selectedStudentId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Silakan pilih siswa terlebih dahulu'),
+          backgroundColor: AppTheme.statusAlpa,
+        ),
+      );
+      return;
+    }
 
     setState(() => _isLoading = true);
 
     try {
       final database = ref.read(appDatabaseProvider);
       
-      // Simpan data guru
-      await database.insertTeacher(
-        TeachersCompanion.insert(
-          name: _nameController.text.trim(),
-          className: _classController.text.trim(),
+      // Simpan data orang tua
+      await database.insertParent(
+        ParentsCompanion.insert(
+          studentId: int.parse(_selectedStudentId!),
+          name: _parentNameController.text.trim(),
         ),
       );
       
-      // Simpan role sebagai guru
-      await database.setSetting('user_role', 'guru');
-      await database.setSetting('current_class', _classController.text.trim());
+      // Simpan role sebagai orang tua
+      await database.setSetting('user_role', 'orang_tua');
+      await database.setSetting('current_student_id', _selectedStudentId!);
 
       if (mounted) {
-        context.go('/teacher-home');
+        context.go('/parent-home');
       }
     } catch (e) {
       if (mounted) {
@@ -67,7 +101,7 @@ class _TeacherOnboardingScreenState extends ConsumerState<TeacherOnboardingScree
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Data Wali Kelas'),
+        title: const Text('Data Orang Tua'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/role-selection'),
@@ -87,13 +121,13 @@ class _TeacherOnboardingScreenState extends ConsumerState<TeacherOnboardingScree
                     width: 100,
                     height: 100,
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryBlue.withOpacity(0.1),
+                      color: AppTheme.secondaryGreen.withOpacity(0.1),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
-                      Icons.person,
+                      Icons.family_restroom,
                       size: 60,
-                      color: AppTheme.primaryBlue,
+                      color: AppTheme.secondaryGreen,
                     ),
                   ),
                 ),
@@ -106,19 +140,19 @@ class _TeacherOnboardingScreenState extends ConsumerState<TeacherOnboardingScree
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Masukkan nama dan kelas yang Anda ampu',
+                  'Masukkan data diri dan pilih anak Anda',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppTheme.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 32),
                 
-                // Input Nama
+                // Input Nama Orang Tua
                 TextFormField(
-                  controller: _nameController,
+                  controller: _parentNameController,
                   decoration: const InputDecoration(
-                    labelText: 'Nama Wali Kelas',
-                    hintText: 'Contoh: Budi Santoso',
+                    labelText: 'Nama Orang Tua',
+                    hintText: 'Contoh: Ahmad Wijaya',
                     prefixIcon: Icon(Icons.person_outline),
                   ),
                   textCapitalization: TextCapitalization.words,
@@ -138,11 +172,16 @@ class _TeacherOnboardingScreenState extends ConsumerState<TeacherOnboardingScree
                 TextFormField(
                   controller: _classController,
                   decoration: const InputDecoration(
-                    labelText: 'Kelas',
-                    hintText: 'Contoh: 3A, 5B, 10 IPA 1',
+                    labelText: 'Kelas Anak',
+                    hintText: 'Contoh: 3A, 5B',
                     prefixIcon: Icon(Icons.class_),
                   ),
                   textCapitalization: TextCapitalization.characters,
+                  onChanged: (value) {
+                    if (value.trim().isNotEmpty) {
+                      _loadStudentsByClass(value.trim());
+                    }
+                  },
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Kelas wajib diisi';
@@ -150,6 +189,46 @@ class _TeacherOnboardingScreenState extends ConsumerState<TeacherOnboardingScree
                     return null;
                   },
                 ),
+                const SizedBox(height: 24),
+                
+                // Dropdown Pilih Siswa
+                DropdownButtonFormField<String>(
+                  value: _selectedStudentId,
+                  decoration: const InputDecoration(
+                    labelText: 'Pilih Nama Siswa',
+                    hintText: 'Pilih nama anak Anda',
+                    prefixIcon: Icon(Icons.child_care),
+                  ),
+                  items: _students.map((student) {
+                    return DropdownMenuItem(
+                      value: student.id.toString(),
+                      child: Text(student.name),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedStudentId = value;
+                    });
+                  },
+                  validator: (value) {
+                    if (value == null) {
+                      return 'Silakan pilih siswa';
+                    }
+                    return null;
+                  },
+                ),
+                
+                if (_students.isEmpty && _classController.text.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Text(
+                      'Tidak ada siswa di kelas ini. Hubungi guru untuk menambahkan.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.statusAlpa,
+                      ),
+                    ),
+                  ),
+                
                 const SizedBox(height: 48),
                 
                 // Tombol Lanjut
@@ -158,6 +237,9 @@ class _TeacherOnboardingScreenState extends ConsumerState<TeacherOnboardingScree
                   height: 56,
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _submit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.secondaryGreen,
+                    ),
                     child: _isLoading
                         ? const SizedBox(
                             width: 24,

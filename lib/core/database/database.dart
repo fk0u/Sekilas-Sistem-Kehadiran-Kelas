@@ -199,7 +199,7 @@ class AppDatabase extends _$AppDatabase {
       AppSettingsCompanion.insert(
         key: key,
         value: value,
-        updatedAt: DateTime.now(),
+        updatedAt: Value(DateTime.now()),
       ),
     );
   }

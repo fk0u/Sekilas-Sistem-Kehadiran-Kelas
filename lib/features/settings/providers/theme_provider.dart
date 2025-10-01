@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/database/database.dart';
+import '../../../core/database/database.dart';
 
 class ThemeModeNotifier extends StateNotifier<bool> {
   final AppDatabase database;
