@@ -211,6 +211,10 @@ class AppDatabase extends _$AppDatabase {
   // Parent methods
   Future<Parent?> getParent() => select(parents).getSingleOrNull();
 
+  // Student methods
+  Future<Student?> getStudentById(int id) =>
+      (select(students)..where((t) => t.id.equals(id))).getSingleOrNull();
+
   // Watch methods for streams
   Stream<List<Permission>> watchPermissionsByParent(int parentId) {
     return (select(permissions)

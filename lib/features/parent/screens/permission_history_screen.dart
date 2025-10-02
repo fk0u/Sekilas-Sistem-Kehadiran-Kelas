@@ -4,6 +4,7 @@ import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/loading_widget.dart';
 import '../widgets/permission_card.dart';
 import '../providers/permission_provider.dart';
+import 'permission_detail_screen.dart';
 
 class PermissionHistoryScreen extends ConsumerWidget {
   const PermissionHistoryScreen({super.key});
@@ -47,9 +48,12 @@ class PermissionHistoryScreen extends ConsumerWidget {
                   return PermissionCard(
                     permission: permission,
                     onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Detail izin - Coming Soon'),
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => PermissionDetailScreen(
+                            permission: permission,
+                          ),
                         ),
                       );
                     },
