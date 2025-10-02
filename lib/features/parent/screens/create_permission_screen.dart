@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:drift/drift.dart' as drift;
 import '../../../core/database/database.dart';
 import '../../../core/theme/app_theme.dart';
 import '../providers/permission_provider.dart';
@@ -83,20 +82,19 @@ class _CreatePermissionScreenState extends ConsumerState<CreatePermissionScreen>
 
     final createPermission = ref.read(createPermissionProvider);
     
-    final qrData = 'PERMISSION_${parent.studentId}_${DateTime.now().millisecondsSinceEpoch}';
+    final qrData = 'PERMISSION_${parent['studentId']}_${DateTime.now().millisecondsSinceEpoch}';
 
     try {
-      await createPermission(
-        PermissionsCompanion.insert(
-          studentId: parent.studentId,
-          parentId: parent.id,
-          permissionType: _permissionType,
-          startDate: _startDate,
-          endDate: _endDate,
-          reason: drift.Value(_reasonController.text.trim()),
-          qrCode: qrData,
-        ),
-      );
+      await createPermission({
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'studentId': parent['studentId'],
+        'parentId': parent['id'],
+        'permissionType': _permissionType,
+        'startDate': _startDate.toIso8601String(),
+        'endDate': _endDate.toIso8601String(),
+        'reason': _reasonController.text.trim(),
+        'qrCode': qrData,
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

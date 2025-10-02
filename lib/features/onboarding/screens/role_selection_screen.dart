@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/storage/local_storage.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/data/dummy_data.dart';
 
 class RoleSelectionScreen extends ConsumerStatefulWidget {
   const RoleSelectionScreen({super.key});
@@ -30,14 +29,9 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
       final storage = ref.read(localStorageProvider);
       await storage.setSchoolName(_schoolNameController.text.trim());
       
-      // Simpan data dummy siswa yang realistis
-      final dummyStudents = DummyData.getStudents();
-      await storage.setStudentsData(dummyStudents);
-      
-      // Simpan juga data guru dummy untuk demonstrasi
-      if (storage.getTeacherData() == null) {
-        final dummyTeacher = DummyData.getTeacher();
-        await storage.setTeacherData(dummyTeacher);
+      // Siapkan struktur data siswa kosong yang akan diisi nanti
+      if (storage.getStudentsData() == null) {
+        await storage.setStudentsData([]);
       }
 
       setState(() {

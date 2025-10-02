@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sekilas/main.dart'; // Import main.dart untuk mengakses sharedPreferencesProvider
 
 // Key constants
 class StorageKeys {
@@ -11,11 +12,6 @@ class StorageKeys {
   static const String parentData = 'parent_data';
   static const String studentsData = 'students_data';
 }
-
-// Provider for SharedPreferences
-final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
-  throw UnimplementedError('Initialize sharedPreferencesProvider in main.dart');
-});
 
 // Provider for local storage service
 final localStorageProvider = Provider<LocalStorageService>((ref) {

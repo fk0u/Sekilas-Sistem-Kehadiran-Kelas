@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:drift/drift.dart' as drift;
-import '../../../core/database/database.dart';
+import '../../../core/storage/local_storage.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/loading_widget.dart';
-import '../widgets/student_card.dart';
-import '../providers/student_provider.dart';
+import '../widgets/student_local_card.dart';
 
 class StudentManagementScreen extends ConsumerStatefulWidget {
   const StudentManagementScreen({super.key});
@@ -18,6 +16,9 @@ class StudentManagementScreen extends ConsumerStatefulWidget {
 
 class _StudentManagementScreenState extends ConsumerState<StudentManagementScreen> {
   String _searchQuery = '';
+  String _currentClass = '';
+  List<Map<String, dynamic>> _students = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -26,11 +27,33 @@ class _StudentManagementScreenState extends ConsumerState<StudentManagementScree
   }
 
   Future<void> _loadCurrentClass() async {
-    final database = ref.read(appDatabaseProvider);
-    final teacher = await database.getTeacher();
+    setState(() => _isLoading = true);
+    
+    final storage = ref.read(localStorageProvider);
+    final teacher = storage.getTeacherData();
     if (teacher != null) {
-      ref.read(currentClassProvider.notifier).state = teacher.className;
+      setState(() {
+        _currentClass = teacher['className'] ?? '';
+      });
+      await _loadStudents();
     }
+    
+    setState(() => _isLoading = false);
+  }
+  
+  Future<void> _loadStudents() async {
+    final storage = ref.read(localStorageProvider);
+    final allStudents = storage.getStudentsData() ?? [];
+    final filteredStudents = allStudents.where((student) => 
+      student['className'] == _currentClass
+    ).toList();
+    
+    // Urutkan berdasarkan sortOrder
+    filteredStudents.sort((a, b) => (a['sortOrder'] as int? ?? 0).compareTo(b['sortOrder'] as int? ?? 0));
+    
+    setState(() {
+      _students = filteredStudents;
+    });
   }
 
   Future<void> _showAddStudentDialog() async {
@@ -75,103 +98,41 @@ class _StudentManagementScreenState extends ConsumerState<StudentManagementScree
           ElevatedButton(
             onPressed: () async {
               if (formKey.currentState!.validate()) {
-                final className = ref.read(currentClassProvider);
-                final addStudent = ref.read(addStudentProvider);
+                final storage = ref.read(localStorageProvider);
                 
                 try {
-                  await addStudent(
-                    StudentsCompanion.insert(
-                      name: nameController.text.trim(),
-                      className: className,
-                    ),
-                  );
+                  // Buat data siswa baru
+                  final newStudent = {
+                    'id': DateTime.now().millisecondsSinceEpoch,
+                    'name': nameController.text.trim(),
+                    'className': _currentClass,
+                    'photoPath': null,
+                    'sortOrder': _students.length,
+                    'createdAt': DateTime.now().toIso8601String(),
+                  };
                   
-                  if (context.mounted) {
+                  // Tambahkan ke storage
+                  await storage.addOrUpdateStudent(newStudent);
+                  
+                  // Refresh daftar siswa
+                  await _loadStudents();
+                  
+                  if (mounted) {
                     context.pop();
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Siswa berhasil ditambahkan'),
-                        backgroundColor: AppTheme.statusHadir,
+                        backgroundColor: Colors.green,
                       ),
                     );
                   }
                 } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error: $e'),
-                        backgroundColor: AppTheme.statusAlpa,
-                      ),
-                    );
-                  }
-                }
-              }
-            },
-            child: const Text('Tambah'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _showEditStudentDialog(Student student) async {
-    final nameController = TextEditingController(text: student.name);
-    final formKey = GlobalKey<FormState>();
-
-    return showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Siswa'),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: nameController,
-            decoration: const InputDecoration(
-              labelText: 'Nama Siswa',
-              prefixIcon: Icon(Icons.person),
-            ),
-            textCapitalization: TextCapitalization.words,
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'Nama wajib diisi';
-              }
-              if (value.trim().length < 3) {
-                return 'Nama minimal 3 karakter';
-              }
-              return null;
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => context.pop(),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                final updateStudent = ref.read(updateStudentProvider);
-                
-                try {
-                  await updateStudent(
-                    student.copyWith(name: nameController.text.trim()),
-                  );
-                  
-                  if (context.mounted) {
+                  if (mounted) {
                     context.pop();
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Siswa berhasil diupdate'),
-                        backgroundColor: AppTheme.statusHadir,
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Error: $e'),
-                        backgroundColor: AppTheme.statusAlpa,
+                        content: Text('Gagal menambahkan siswa: $e'),
+                        backgroundColor: Colors.red,
                       ),
                     );
                   }
@@ -185,12 +146,40 @@ class _StudentManagementScreenState extends ConsumerState<StudentManagementScree
     );
   }
 
-  Future<void> _confirmDeleteStudent(Student student) async {
+  Future<void> _showEditStudentDialog(Map<String, dynamic> student) async {
+    final nameController = TextEditingController(text: student['name']);
+    final formKey = GlobalKey<FormState>();
+
     return showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Hapus Siswa'),
-        content: Text('Yakin ingin menghapus ${student.name}?'),
+        title: const Text('Edit Siswa'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Nama Siswa',
+                  hintText: 'Contoh: Andi Wijaya',
+                  prefixIcon: Icon(Icons.person),
+                ),
+                textCapitalization: TextCapitalization.words,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Nama wajib diisi';
+                  }
+                  if (value.trim().length < 3) {
+                    return 'Nama minimal 3 karakter';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => context.pop(),
@@ -198,33 +187,103 @@ class _StudentManagementScreenState extends ConsumerState<StudentManagementScree
           ),
           ElevatedButton(
             onPressed: () async {
-              final deleteStudent = ref.read(deleteStudentProvider);
+              if (formKey.currentState!.validate()) {
+                final storage = ref.read(localStorageProvider);
+                
+                try {
+                  // Update data siswa
+                  final updatedStudent = {
+                    ...student,
+                    'name': nameController.text.trim(),
+                    'updatedAt': DateTime.now().toIso8601String(),
+                  };
+                  
+                  // Simpan ke storage
+                  await storage.addOrUpdateStudent(updatedStudent);
+                  
+                  // Refresh daftar siswa
+                  await _loadStudents();
+                  
+                  if (mounted) {
+                    context.pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Data siswa berhasil diperbarui'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    context.pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Gagal memperbarui data siswa: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              }
+            },
+            child: const Text('Simpan'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteStudent(Map<String, dynamic> student) async {
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Konfirmasi Hapus'),
+        content: Text('Apakah Anda yakin ingin menghapus ${student['name']}?'),
+        actions: [
+          TextButton(
+            onPressed: () => context.pop(),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final storage = ref.read(localStorageProvider);
               
               try {
-                await deleteStudent(student.id);
+                // Ambil daftar siswa saat ini
+                final allStudents = storage.getStudentsData() ?? [];
                 
-                if (context.mounted) {
+                // Filter untuk menghapus siswa yang dipilih
+                final updatedStudents = allStudents.where((s) => s['id'] != student['id']).toList();
+                
+                // Simpan daftar baru
+                await storage.setStudentsData(updatedStudents);
+                
+                // Refresh daftar
+                await _loadStudents();
+                
+                if (mounted) {
                   context.pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Siswa berhasil dihapus'),
-                      backgroundColor: AppTheme.statusAlpa,
+                      backgroundColor: Colors.green,
                     ),
                   );
                 }
               } catch (e) {
-                if (context.mounted) {
+                if (mounted) {
+                  context.pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Error: $e'),
-                      backgroundColor: AppTheme.statusAlpa,
+                      content: Text('Gagal menghapus siswa: $e'),
+                      backgroundColor: Colors.red,
                     ),
                   );
                 }
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.statusAlpa,
+              backgroundColor: Colors.red,
             ),
             child: const Text('Hapus'),
           ),
@@ -233,91 +292,89 @@ class _StudentManagementScreenState extends ConsumerState<StudentManagementScree
     );
   }
 
+  List<Map<String, dynamic>> _getFilteredStudents() {
+    if (_searchQuery.isEmpty) {
+      return _students;
+    }
+    
+    final query = _searchQuery.toLowerCase();
+    return _students.where((student) => 
+      student['name'].toString().toLowerCase().contains(query)
+    ).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final className = ref.watch(currentClassProvider);
-    final studentsAsync = ref.watch(studentsProvider(className));
-
+    final filteredStudents = _getFilteredStudents();
+    
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Kelola Siswa'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.upload),
-            onPressed: () {
-              // TODO: Implement import students
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Import siswa - Coming Soon')),
-              );
-            },
-            tooltip: 'Import Siswa',
-          ),
-        ],
+        title: const Text('Manajemen Siswa'),
+        elevation: 0,
       ),
       body: Column(
         children: [
-          // Search Bar
+          // Header dan pencarian
           Padding(
             padding: const EdgeInsets.all(16),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Cari siswa...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Kelas: $_currentClass',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value.toLowerCase();
-                });
-              },
+                const SizedBox(height: 16),
+                TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Cari siswa...',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                  },
+                ),
+              ],
             ),
           ),
           
-          // Students List
+          // Daftar siswa
           Expanded(
-            child: studentsAsync.when(
-              data: (students) {
-                final filteredStudents = students.where((student) {
-                  return student.name.toLowerCase().contains(_searchQuery);
-                }).toList();
-
-                if (filteredStudents.isEmpty) {
-                  return EmptyStateWidget(
-                    title: 'Belum Ada Siswa',
-                    message: 'Tambahkan siswa pertama dengan menekan tombol + di bawah',
-                    icon: Icons.people_outline,
-                    actionText: 'Tambah Siswa',
-                    onAction: _showAddStudentDialog,
-                  );
-                }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.only(bottom: 80),
-                  itemCount: filteredStudents.length,
-                  itemBuilder: (context, index) {
-                    final student = filteredStudents[index];
-                    return StudentCard(
-                      student: student,
-                      onEdit: () => _showEditStudentDialog(student),
-                      onDelete: () => _confirmDeleteStudent(student),
-                    );
-                  },
-                );
-              },
-              loading: () => const LoadingWidget(message: 'Memuat data siswa...'),
-              error: (error, stack) => Center(
-                child: Text('Error: $error'),
-              ),
-            ),
+            child: _isLoading
+                ? const LoadingWidget(message: 'Memuat daftar siswa...')
+                : filteredStudents.isEmpty
+                    ? const EmptyStateWidget(
+                        icon: Icons.people,
+                        title: 'Daftar Siswa Kosong',
+                        message: 'Belum ada siswa di kelas ini',
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.only(bottom: 100),
+                        itemCount: filteredStudents.length,
+                        itemBuilder: (context, index) {
+                          final student = filteredStudents[index];
+                          return StudentLocalCard(
+                            student: student,
+                            onTap: () => _showEditStudentDialog(student),
+                            onEdit: () => _showEditStudentDialog(student),
+                            onDelete: () => _confirmDeleteStudent(student),
+                          );
+                        },
+                      ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton(
         onPressed: _showAddStudentDialog,
-        icon: const Icon(Icons.add),
-        label: const Text('Tambah Siswa'),
+        child: const Icon(Icons.add),
       ),
     );
   }
