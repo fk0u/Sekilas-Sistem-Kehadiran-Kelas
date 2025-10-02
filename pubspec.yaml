@@ -28,8 +28,11 @@ dependencies:
   google_mlkit_text_recognition: ^0.11.0
   
   # PDF & Excel
-  pdf: ^3.10.7
-  printing: ^5.11.1
+  
+  # Storage
+  shared_preferences: ^2.2.2
+  pdf: ^3.10.8
+  printing: ^5.12.0
   excel: ^4.0.2
   
   # Image
@@ -69,6 +72,7 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    - assets/illustrations/
   
   # Font Poppins akan otomatis di-download oleh google_fonts package
   # Uncomment section di bawah jika ingin menggunakan font lokal:

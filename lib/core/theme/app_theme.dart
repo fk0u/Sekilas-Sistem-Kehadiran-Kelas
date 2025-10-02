@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  // Colors
-  static const Color primaryBlue = Color(0xFF4A90E2);
-  static const Color secondaryGreen = Color(0xFF7ED321);
-  static const Color accentGreen = Color(0xFF50C878);
-  static const Color backgroundColor = Color(0xFFFAFAFA);
+  // Colors - Inspired by Notion
+  static const Color primaryBlue = Color(0xFF2E3C42); // Dark blue-gray for primary actions
+  static const Color secondaryGreen = Color(0xFF37A2BC); // Teal-like for secondary elements
+  static const Color accentGreen = Color(0xFF25D366); // WhatsApp green for accent
+  static const Color backgroundColor = Color(0xFFF7F6F3); // Subtle off-white like Notion
   static const Color cardColor = Colors.white;
-  static const Color textPrimary = Color(0xFF2C3E50);
-  static const Color textSecondary = Color(0xFF7F8C8D);
+  static const Color textPrimary = Color(0xFF37352F); // Notion's text color
+  static const Color textSecondary = Color(0xFF787774); // Notion's secondary text
   
   // Status Colors
   static const Color statusHadir = Color(0xFF4CAF50); // ✅ Hijau

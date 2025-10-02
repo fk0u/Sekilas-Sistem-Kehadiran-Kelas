@@ -207,6 +207,16 @@ class AppDatabase extends _$AppDatabase {
   Future<int> deleteSetting(String key) {
     return (delete(appSettings)..where((t) => t.key.equals(key))).go();
   }
+  
+  // School methods
+  Future<String?> getSchoolName() async {
+    final setting = await getSetting('school_name');
+    return setting?.value;
+  }
+
+  Future<void> setSchoolName(String name) async {
+    await setSetting('school_name', name);
+  }
 
   // Parent methods
   Future<Parent?> getParent() => select(parents).getSingleOrNull();
@@ -234,5 +244,7 @@ LazyDatabase _openConnection() {
 
 // Provider
 final appDatabaseProvider = Provider<AppDatabase>((ref) {
-  throw UnimplementedError();
+  final db = AppDatabase();
+  ref.onDispose(() => db.close());
+  return db;
 });

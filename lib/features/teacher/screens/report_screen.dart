@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/loading_widget.dart';
+import '../../../core/database/database.dart';
 import '../providers/report_provider.dart';
+import '../utils/report_pdf_generator.dart';
 
 class ReportScreen extends ConsumerWidget {
   const ReportScreen({super.key});
@@ -122,11 +125,7 @@ class ReportScreen extends ConsumerWidget {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Export PDF - Coming Soon')),
-                      );
-                    },
+                    onPressed: () => _exportToPdf(context, ref, stats, dateRange),
                     icon: const Icon(Icons.picture_as_pdf),
                     label: const Text('Export PDF'),
                   ),
@@ -134,11 +133,7 @@ class ReportScreen extends ConsumerWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Export Excel - Coming Soon')),
-                      );
-                    },
+                    onPressed: () => _showExportExcelComingSoon(context),
                     icon: const Icon(Icons.table_chart),
                     label: const Text('Export Excel'),
                   ),
@@ -403,5 +398,83 @@ class ReportScreen extends ConsumerWidget {
 
   String _formatDate(DateTime date) {
     return DateFormat('dd MMM yyyy').format(date);
+  }
+  
+  Future<void> _exportToPdf(
+    BuildContext context, 
+    WidgetRef ref, 
+    AttendanceStats stats,
+    DateTimeRange dateRange,
+  ) async {
+    try {
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Menghasilkan laporan PDF...'),
+            ],
+          ),
+        ),
+      );
+      
+      // Get school name and class name
+      final database = ref.read(appDatabaseProvider);
+      final schoolName = await database.getSchoolName();
+      final teacher = await database.getTeacher();
+      final className = teacher?.className;
+      
+      // Generate PDF document
+      final pdfData = await ReportPdfGenerator.generateAttendanceReport(
+        stats: stats,
+        dateRange: dateRange,
+        schoolName: schoolName,
+        className: className,
+      );
+      
+      // Close loading dialog
+      Navigator.of(context).pop();
+      
+      // Open PDF preview
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => Scaffold(
+            appBar: AppBar(
+              title: const Text('Preview Laporan PDF'),
+            ),
+            body: PdfPreview(
+              build: (format) => pdfData,
+              canChangeOrientation: false,
+              canChangePageFormat: false,
+              canDebug: false,
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      // Close loading dialog if showing
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal membuat PDF: ${e.toString()}')),
+      );
+    }
+  }
+  
+  void _showExportExcelComingSoon(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Ekspor ke Excel akan segera tersedia!'),
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 }

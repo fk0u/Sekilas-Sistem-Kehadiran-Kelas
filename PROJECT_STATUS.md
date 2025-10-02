@@ -2,7 +2,7 @@
 
 > **Status:** 🚧 Dalam Pengembangan - MVP (Minimum Viable Product)
 
-Aplikasi absensi sekolah offline untuk Guru dan Orang Tua dengan desain minimalis dan modern. Semua data disimpan lokal, tanpa internet/server.
+Aplikasi absensi sekolah offline untuk Guru dan Orang Tua dengan desain minimalis dan modern. Semua data disimpan lokal, tanpa internet/server. Aplikasi ini dapat menampilkan nama sekolah yang diinput oleh pengguna saat pertama kali menggunakan aplikasi.
 
 ## ✨ Fitur yang Sudah Dibuat
 

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/database/database.dart';
+import '../../../core/storage/local_storage.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/auth/auth_provider.dart';
 
 class TeacherOnboardingScreen extends ConsumerStatefulWidget {
   const TeacherOnboardingScreen({super.key});
@@ -30,19 +31,22 @@ class _TeacherOnboardingScreenState extends ConsumerState<TeacherOnboardingScree
     setState(() => _isLoading = true);
 
     try {
-      final database = ref.read(appDatabaseProvider);
+      final storage = ref.read(localStorageProvider);
+      final authNotifier = ref.read(authProvider.notifier);
       
       // Simpan data guru
-      await database.insertTeacher(
-        TeachersCompanion.insert(
-          name: _nameController.text.trim(),
-          className: _classController.text.trim(),
-        ),
-      );
+      final teacherData = {
+        'id': DateTime.now().millisecondsSinceEpoch,
+        'name': _nameController.text.trim(),
+        'className': _classController.text.trim(),
+        'createdAt': DateTime.now().toIso8601String(),
+      };
       
-      // Simpan role sebagai guru
-      await database.setSetting('user_role', 'guru');
-      await database.setSetting('current_class', _classController.text.trim());
+      // Login sebagai guru menggunakan auth provider
+      await authNotifier.loginAsTeacher(
+        teacherData, 
+        storage.getSchoolName() ?? 'Unknown School'
+      );
 
       if (mounted) {
         context.go('/teacher-home');

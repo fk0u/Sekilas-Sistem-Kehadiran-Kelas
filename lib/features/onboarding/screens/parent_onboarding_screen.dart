@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/database/database.dart';
+import '../../../core/storage/local_storage.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/auth/auth_provider.dart';
 
 class ParentOnboardingScreen extends ConsumerStatefulWidget {
   const ParentOnboardingScreen({super.key});
@@ -16,7 +17,7 @@ class _ParentOnboardingScreenState extends ConsumerState<ParentOnboardingScreen>
   final _parentNameController = TextEditingController();
   final _classController = TextEditingController();
   String? _selectedStudentId;
-  List<Student> _students = [];
+  List<Map<String, dynamic>> _students = [];
   bool _isLoading = false;
 
   @override
@@ -33,18 +34,22 @@ class _ParentOnboardingScreenState extends ConsumerState<ParentOnboardingScreen>
   }
 
   Future<void> _loadStudents() async {
-    final database = ref.read(appDatabaseProvider);
-    final students = await database.getAllStudents();
+    final storage = ref.read(localStorageProvider);
+    final students = storage.getStudentsData() ?? [];
     setState(() {
       _students = students;
     });
   }
 
   Future<void> _loadStudentsByClass(String className) async {
-    final database = ref.read(appDatabaseProvider);
-    final students = await database.getStudentsByClass(className);
+    final storage = ref.read(localStorageProvider);
+    final allStudents = storage.getStudentsData() ?? [];
+    final filteredStudents = allStudents.where(
+      (student) => student['className'] == className
+    ).toList();
+    
     setState(() {
-      _students = students;
+      _students = filteredStudents;
       _selectedStudentId = null;
     });
   }
@@ -64,19 +69,30 @@ class _ParentOnboardingScreenState extends ConsumerState<ParentOnboardingScreen>
     setState(() => _isLoading = true);
 
     try {
-      final database = ref.read(appDatabaseProvider);
+      final storage = ref.read(localStorageProvider);
+      final authNotifier = ref.read(authProvider.notifier);
+      final selectedStudentId = int.parse(_selectedStudentId!);
       
-      // Simpan data orang tua
-      await database.insertParent(
-        ParentsCompanion.insert(
-          studentId: int.parse(_selectedStudentId!),
-          name: _parentNameController.text.trim(),
-        ),
+      // Temukan data siswa yang dipilih
+      final students = storage.getStudentsData() ?? [];
+      final selectedStudent = students.firstWhere(
+        (student) => student['id'] == selectedStudentId,
+        orElse: () => <String, dynamic>{},
       );
       
-      // Simpan role sebagai orang tua
-      await database.setSetting('user_role', 'orang_tua');
-      await database.setSetting('current_student_id', _selectedStudentId!);
+      // Simpan data orang tua
+      final parentData = {
+        'id': DateTime.now().millisecondsSinceEpoch,
+        'studentId': selectedStudentId,
+        'name': _parentNameController.text.trim(),
+        'createdAt': DateTime.now().toIso8601String(),
+      };
+      
+      // Login sebagai orang tua menggunakan auth provider
+      await authNotifier.loginAsParent(
+        parentData, 
+        storage.getSchoolName() ?? 'Unknown School'
+      );
 
       if (mounted) {
         context.go('/parent-home');
@@ -201,8 +217,8 @@ class _ParentOnboardingScreenState extends ConsumerState<ParentOnboardingScreen>
                   ),
                   items: _students.map((student) {
                     return DropdownMenuItem(
-                      value: student.id.toString(),
-                      child: Text(student.name),
+                      value: student['id'].toString(),
+                      child: Text(student['name']),
                     );
                   }).toList(),
                   onChanged: (value) {

@@ -1,5 +1,6 @@
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../auth/auth_provider.dart';
 import '../../features/onboarding/screens/role_selection_screen.dart';
 import '../../features/onboarding/screens/teacher_onboarding_screen.dart';
 import '../../features/onboarding/screens/parent_onboarding_screen.dart';
@@ -17,6 +18,39 @@ import '../../features/parent/screens/parent_settings_screen.dart';
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/role-selection',
+    redirect: (context, state) {
+      final authState = ref.read(authProvider);
+      
+      // If authenticated, redirect to appropriate home screen
+      if (authState.status == AuthStatus.authenticated) {
+        if (authState.userRole == 'guru' && 
+            state.fullPath != '/teacher-home' && 
+            !state.fullPath!.startsWith('/student-management') &&
+            !state.fullPath!.startsWith('/attendance') &&
+            !state.fullPath!.startsWith('/scan-permission') &&
+            !state.fullPath!.startsWith('/report') &&
+            !state.fullPath!.startsWith('/teacher-settings')) {
+          return '/teacher-home';
+        } else if (authState.userRole == 'orangTua' && 
+                  state.fullPath != '/parent-home' &&
+                  !state.fullPath!.startsWith('/create-permission') &&
+                  !state.fullPath!.startsWith('/permission-history') &&
+                  !state.fullPath!.startsWith('/parent-settings')) {
+          return '/parent-home';
+        }
+      }
+      
+      // If trying to access protected routes while not authenticated
+      if (authState.status == AuthStatus.unauthenticated) {
+        if (state.fullPath != '/role-selection' && 
+            state.fullPath != '/teacher-onboarding' && 
+            state.fullPath != '/parent-onboarding') {
+          return '/role-selection';
+        }
+      }
+      
+      return null;
+    },
     routes: [
       // Onboarding Routes
       GoRoute(
