@@ -73,17 +73,9 @@ class _MyAppState extends ConsumerState<MyApp> {
     // Log auth state for debugging
     print('Auth State: ${authState.status}, Role: ${authState.userRole}');
     
-    // Auto-redirect based on auth state
-    if (authState.status == AuthStatus.authenticated) {
-      // Wait a bit to ensure UI is ready before redirecting
-      Future.delayed(Duration.zero, () {
-        if (authState.userRole == 'guru') {
-          router.go('/teacher-home');
-        } else if (authState.userRole == 'orangTua') {
-          router.go('/parent-home');
-        }
-      });
-    }
+    // Auto-redirect sudah ditangani oleh GoRouter redirect logic
+    // Tidak perlu melakukan redirect secara manual di sini
+    // karena akan menimbulkan masalah redirect loop
     
     return MaterialApp.router(
       title: 'Sekilas - Sistem Kehadiran Kelas',

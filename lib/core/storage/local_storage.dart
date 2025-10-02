@@ -141,8 +141,98 @@ class LocalStorageService {
     
     return [];
   }
+  
+  // Metode tambahan untuk mendukung DatabaseService
+  
+  Future<List<Map<String, dynamic>>> getAttendanceRecords() async {
+    final List<Map<String, dynamic>> allAttendances = [];
+    
+    // Mencari semua kunci yang dimulai dengan "attendance_"
+    final keys = _prefs.getKeys().where((key) => key.startsWith('attendance_'));
+    
+    for (final key in keys) {
+      final data = _prefs.getString(key);
+      if (data != null) {
+        final List<dynamic> jsonData = jsonDecode(data);
+        allAttendances.addAll(jsonData.cast<Map<String, dynamic>>());
+      }
+    }
+    
+    return allAttendances;
+  }
+  
+  Future<void> addOrUpdateAttendance(Map<String, dynamic> attendance) async {
+    // Format tanggal: YYYY-MM-DD
+    final dateStr = attendance['date'];
+    final key = 'attendance_$dateStr';
+    
+    final existingData = _prefs.getString(key);
+    List<dynamic> attendances = [];
+    
+    if (existingData != null) {
+      attendances = jsonDecode(existingData);
+    }
+    
+    // Cek apakah sudah ada data kehadiran untuk siswa tersebut
+    final studentId = attendance['studentId'];
+    final index = attendances.indexWhere((a) => a['studentId'] == studentId);
+    
+    if (index >= 0) {
+      attendances[index] = attendance;
+    } else {
+      attendances.add(attendance);
+    }
+    
+    await _prefs.setString(key, jsonEncode(attendances));
+  }
+  
+  // Metode untuk permission (izin)
+  
+  Future<List<Map<String, dynamic>>> getPermissions() async {
+    final data = _prefs.getString('permissions');
+    if (data != null) {
+      final List<dynamic> jsonData = jsonDecode(data);
+      return jsonData.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
+  
+  Future<void> addOrUpdatePermission(Map<String, dynamic> permission) async {
+    final permissions = await getPermissions();
+    
+    // Cek apakah permission dengan id yang sama sudah ada
+    final permissionId = permission['id'];
+    final index = permissions.indexWhere((p) => p['id'] == permissionId);
+    
+    if (index >= 0) {
+      permissions[index] = permission;
+    } else {
+      permissions.add(permission);
+    }
+    
+    await _prefs.setString('permissions', jsonEncode(permissions));
+  }
 
   // Clear auth data (for logout)
+  // Metode untuk mendukung DatabaseService
+  Future<void> removeTeacherData() async {
+    await _prefs.remove(StorageKeys.teacherData);
+  }
+  
+  Future<void> removeParentData() async {
+    await _prefs.remove(StorageKeys.parentData);
+  }
+  
+  Future<List<Map<String, dynamic>>> getAllStudents() async {
+    return getStudentsData() ?? [];
+  }
+  
+  Future<void> deleteStudent(String id) async {
+    final students = getStudentsData() ?? [];
+    students.removeWhere((student) => student['id'].toString() == id);
+    await setStudentsData(students);
+  }
+
   Future<void> clearAll() async {
     // Only clear auth-related data but keep school name and student data
     await _prefs.remove(StorageKeys.isLoggedIn);

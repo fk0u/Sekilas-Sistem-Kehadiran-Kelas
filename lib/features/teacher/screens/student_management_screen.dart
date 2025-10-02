@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/storage/local_storage.dart';
+import '../../../core/database/database.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/loading_widget.dart';
@@ -17,7 +18,7 @@ class StudentManagementScreen extends ConsumerStatefulWidget {
 class _StudentManagementScreenState extends ConsumerState<StudentManagementScreen> {
   String _searchQuery = '';
   String _currentClass = '';
-  List<Map<String, dynamic>> _students = [];
+  List<Student> _students = [];
   bool _isLoading = true;
 
   @override
@@ -29,11 +30,11 @@ class _StudentManagementScreenState extends ConsumerState<StudentManagementScree
   Future<void> _loadCurrentClass() async {
     setState(() => _isLoading = true);
     
-    final storage = ref.read(localStorageProvider);
-    final teacher = storage.getTeacherData();
+    final database = ref.read(databaseProvider);
+    final teacher = await database.getTeacher();
     if (teacher != null) {
       setState(() {
-        _currentClass = teacher['className'] ?? '';
+        _currentClass = teacher.className;
       });
       await _loadStudents();
     }
@@ -42,14 +43,14 @@ class _StudentManagementScreenState extends ConsumerState<StudentManagementScree
   }
   
   Future<void> _loadStudents() async {
-    final storage = ref.read(localStorageProvider);
-    final allStudents = storage.getStudentsData() ?? [];
+    final database = ref.read(databaseProvider);
+    final allStudents = await database.getAllStudents();
     final filteredStudents = allStudents.where((student) => 
-      student['className'] == _currentClass
+      student.className == _currentClass
     ).toList();
     
-    // Urutkan berdasarkan sortOrder
-    filteredStudents.sort((a, b) => (a['sortOrder'] as int? ?? 0).compareTo(b['sortOrder'] as int? ?? 0));
+    // Urutkan berdasarkan id (karena model baru tidak memiliki sortOrder)
+    filteredStudents.sort((a, b) => a.id.compareTo(b.id));
     
     setState(() {
       _students = filteredStudents;
@@ -106,13 +107,12 @@ class _StudentManagementScreenState extends ConsumerState<StudentManagementScree
                     'id': DateTime.now().millisecondsSinceEpoch,
                     'name': nameController.text.trim(),
                     'className': _currentClass,
-                    'photoPath': null,
-                    'sortOrder': _students.length,
                     'createdAt': DateTime.now().toIso8601String(),
                   };
                   
-                  // Tambahkan ke storage
-                  await storage.addOrUpdateStudent(newStudent);
+                  // Tambahkan ke database
+                  final database = ref.read(databaseProvider);
+                  await database.saveStudent(newStudent);
                   
                   // Refresh daftar siswa
                   await _loadStudents();
@@ -146,8 +146,8 @@ class _StudentManagementScreenState extends ConsumerState<StudentManagementScree
     );
   }
 
-  Future<void> _showEditStudentDialog(Map<String, dynamic> student) async {
-    final nameController = TextEditingController(text: student['name']);
+  Future<void> _showEditStudentDialog(Student student) async {
+    final nameController = TextEditingController(text: student.name);
     final formKey = GlobalKey<FormState>();
 
     return showDialog(
@@ -188,18 +188,19 @@ class _StudentManagementScreenState extends ConsumerState<StudentManagementScree
           ElevatedButton(
             onPressed: () async {
               if (formKey.currentState!.validate()) {
-                final storage = ref.read(localStorageProvider);
+                final database = ref.read(databaseProvider);
                 
                 try {
                   // Update data siswa
-                  final updatedStudent = {
-                    ...student,
-                    'name': nameController.text.trim(),
-                    'updatedAt': DateTime.now().toIso8601String(),
-                  };
+                  final updatedStudent = Student(
+                    id: student.id,
+                    name: nameController.text.trim(),
+                    className: student.className,
+                    createdAt: student.createdAt,
+                  );
                   
-                  // Simpan ke storage
-                  await storage.addOrUpdateStudent(updatedStudent);
+                  // Simpan ke database
+                  await database.updateStudent(updatedStudent);
                   
                   // Refresh daftar siswa
                   await _loadStudents();
@@ -233,12 +234,12 @@ class _StudentManagementScreenState extends ConsumerState<StudentManagementScree
     );
   }
 
-  Future<void> _confirmDeleteStudent(Map<String, dynamic> student) async {
+  Future<void> _confirmDeleteStudent(Student student) async {
     return showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Konfirmasi Hapus'),
-        content: Text('Apakah Anda yakin ingin menghapus ${student['name']}?'),
+        content: Text('Apakah Anda yakin ingin menghapus ${student.name}?'),
         actions: [
           TextButton(
             onPressed: () => context.pop(),
@@ -246,17 +247,11 @@ class _StudentManagementScreenState extends ConsumerState<StudentManagementScree
           ),
           ElevatedButton(
             onPressed: () async {
-              final storage = ref.read(localStorageProvider);
+              final database = ref.read(databaseProvider);
               
               try {
-                // Ambil daftar siswa saat ini
-                final allStudents = storage.getStudentsData() ?? [];
-                
-                // Filter untuk menghapus siswa yang dipilih
-                final updatedStudents = allStudents.where((s) => s['id'] != student['id']).toList();
-                
-                // Simpan daftar baru
-                await storage.setStudentsData(updatedStudents);
+                // Hapus siswa dari database
+                await database.deleteStudentById(student.id);
                 
                 // Refresh daftar
                 await _loadStudents();
@@ -292,14 +287,14 @@ class _StudentManagementScreenState extends ConsumerState<StudentManagementScree
     );
   }
 
-  List<Map<String, dynamic>> _getFilteredStudents() {
+  List<Student> _getFilteredStudents() {
     if (_searchQuery.isEmpty) {
       return _students;
     }
     
     final query = _searchQuery.toLowerCase();
     return _students.where((student) => 
-      student['name'].toString().toLowerCase().contains(query)
+      student.name.toLowerCase().contains(query)
     ).toList();
   }
 

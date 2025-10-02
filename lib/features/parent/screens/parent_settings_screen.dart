@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/database/database.dart';
+import '../../../core/auth/auth_provider.dart';
 import '../../settings/providers/theme_provider.dart';
 
 class ParentSettingsScreen extends ConsumerWidget {
@@ -18,10 +19,13 @@ class ParentSettingsScreen extends ConsumerWidget {
       ),
       body: ListView(
         children: [
-          FutureBuilder<Parent?>(
+          FutureBuilder<Map<String, dynamic>?>(
             future: database.getParent(),
             builder: (context, snapshot) {
-              final parent = snapshot.data;
+              final parentData = snapshot.data;
+              final String name = parentData != null ? parentData['name'] ?? 'Orang Tua' : 'Orang Tua';
+              final String phone = parentData != null ? parentData['phone'] ?? '-' : '-';
+              
               return Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
@@ -33,7 +37,7 @@ class ParentSettingsScreen extends ConsumerWidget {
                       radius: 40,
                       backgroundColor: AppTheme.secondaryGreen,
                       child: Text(
-                        parent?.name.substring(0, 1).toUpperCase() ?? 'O',
+                        name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'O',
                         style: const TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.bold,
@@ -43,14 +47,14 @@ class ParentSettingsScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      parent?.name ?? 'Orang Tua',
+                      name,
                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      parent?.phone ?? '-',
+                      phone,
                       style: Theme.of(context).textTheme.bodyLarge,
                     ),
                   ],
@@ -79,6 +83,16 @@ class ParentSettingsScreen extends ConsumerWidget {
             title: const Text('Versi Aplikasi'),
             subtitle: const Text('v0.2.0-dev'),
           ),
+          const Divider(),
+          _buildSectionHeader(context, 'Akun'),
+          ListTile(
+            leading: const Icon(Icons.logout, color: Colors.red),
+            title: const Text('Keluar'),
+            subtitle: const Text('Keluar dari akun ini'),
+            onTap: () {
+              _showLogoutConfirmation(context, ref);
+            },
+          ),
           const SizedBox(height: 24),
         ],
       ),
@@ -94,6 +108,30 @@ class ParentSettingsScreen extends ConsumerWidget {
           color: AppTheme.secondaryGreen,
           fontWeight: FontWeight.bold,
         ),
+      ),
+    );
+  }
+  
+  void _showLogoutConfirmation(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Konfirmasi Keluar'),
+        content: const Text('Apakah Anda yakin ingin keluar dari akun ini?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Logout menggunakan auth provider
+              ref.read(authProvider.notifier).logout();
+            },
+            child: const Text('Keluar', style: TextStyle(color: Colors.red)),
+          ),
+        ],
       ),
     );
   }

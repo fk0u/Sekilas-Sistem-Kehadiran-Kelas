@@ -43,7 +43,7 @@ class _ScanPermissionScreenState extends ConsumerState<ScanPermissionScreen> {
         return;
       }
 
-      if (permission.isUsed) {
+      if (permission['isUsed'] == true) {
         _showErrorDialog('QR sudah digunakan', 'QR code ini sudah pernah digunakan sebelumnya.');
         setState(() {
           _isProcessing = false;
@@ -52,7 +52,7 @@ class _ScanPermissionScreenState extends ConsumerState<ScanPermissionScreen> {
       }
 
       // Get student info
-      final student = await database.getStudentById(permission.studentId);
+      final student = await database.getStudentById(permission['studentId']);
       
       if (!mounted) return;
 
@@ -86,7 +86,7 @@ class _ScanPermissionScreenState extends ConsumerState<ScanPermissionScreen> {
     );
   }
 
-  void _showPermissionDialog(Permission permission, Student? student) {
+  void _showPermissionDialog(Map<String, dynamic> permission, Map<String, dynamic>? student) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -95,11 +95,11 @@ class _ScanPermissionScreenState extends ConsumerState<ScanPermissionScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Siswa: ${student?.name ?? 'Unknown'}'),
+            Text('Siswa: ${student?['name'] ?? 'Unknown'}'),
             const SizedBox(height: 8),
-            Text('Jenis: ${permission.permissionType == 'izin' ? 'Izin' : 'Sakit'}'),
+            Text('Jenis: ${permission['permissionType'] == 'izin' ? 'Izin' : 'Sakit'}'),
             const SizedBox(height: 8),
-            Text('Alasan: ${permission.reason ?? '-'}'),
+            Text('Alasan: ${permission['reason'] ?? '-'}'),
           ],
         ),
         actions: [
@@ -109,11 +109,11 @@ class _ScanPermissionScreenState extends ConsumerState<ScanPermissionScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              // TODO: Mark permission as used and update attendance
+              // Mark permission as used and update attendance
               final database = ref.read(appDatabaseProvider);
-              await database.updatePermission(
-                permission.copyWith(isUsed: true),
-              );
+              final updatedPermission = Map<String, dynamic>.from(permission);
+              updatedPermission['isUsed'] = true;
+              await database.updatePermission(updatedPermission);
               
               if (context.mounted) {
                 Navigator.pop(context);

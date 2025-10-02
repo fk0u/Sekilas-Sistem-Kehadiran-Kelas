@@ -21,34 +21,75 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final authState = ref.read(authProvider);
       
-      // If authenticated, redirect to appropriate home screen
+      // Saat aplikasi baru dibuka, periksa status autentikasi
+      if (authState.status == AuthStatus.initial) {
+        // Masih dalam proses pengecekan auth state, tidak melakukan redirect dulu
+        return null;
+      }
+      
+      // Handle authenticated state - auto login ke halaman utama
       if (authState.status == AuthStatus.authenticated) {
-        if (authState.userRole == 'guru' && 
-            state.fullPath != '/teacher-home' && 
-            !state.fullPath!.startsWith('/student-management') &&
-            !state.fullPath!.startsWith('/attendance') &&
-            !state.fullPath!.startsWith('/scan-permission') &&
-            !state.fullPath!.startsWith('/report') &&
-            !state.fullPath!.startsWith('/teacher-settings')) {
-          return '/teacher-home';
-        } else if (authState.userRole == 'orangTua' && 
-                  state.fullPath != '/parent-home' &&
-                  !state.fullPath!.startsWith('/create-permission') &&
-                  !state.fullPath!.startsWith('/permission-history') &&
-                  !state.fullPath!.startsWith('/parent-settings')) {
-          return '/parent-home';
+        // Daftar rute yang diperbolehkan untuk masing-masing peran
+        final teacherAllowedRoutes = [
+          '/teacher-home', 
+          '/student-management', 
+          '/attendance', 
+          '/scan-permission', 
+          '/report', 
+          '/teacher-settings'
+        ];
+        
+        final parentAllowedRoutes = [
+          '/parent-home', 
+          '/create-permission', 
+          '/permission-history', 
+          '/parent-settings'
+        ];
+        
+        // Redirect guru ke halaman guru
+        if (authState.userRole == 'guru') {
+          bool isOnTeacherRoute = false;
+          for (var route in teacherAllowedRoutes) {
+            if (state.fullPath == route || state.fullPath!.startsWith(route)) {
+              isOnTeacherRoute = true;
+              break;
+            }
+          }
+          
+          if (!isOnTeacherRoute) {
+            // Jika tidak berada di halaman guru, redirect ke home guru
+            print('Redirecting to teacher home');
+            return '/teacher-home';
+          }
+        } 
+        // Redirect orang tua ke halaman orang tua
+        else if (authState.userRole == 'orangTua') {
+          bool isOnParentRoute = false;
+          for (var route in parentAllowedRoutes) {
+            if (state.fullPath == route || state.fullPath!.startsWith(route)) {
+              isOnParentRoute = true;
+              break;
+            }
+          }
+          
+          if (!isOnParentRoute) {
+            // Jika tidak berada di halaman orang tua, redirect ke home orang tua
+            print('Redirecting to parent home');
+            return '/parent-home';
+          }
         }
       }
       
-      // If trying to access protected routes while not authenticated
+      // Handle unauthenticated state - redirect ke halaman login/role selection
       if (authState.status == AuthStatus.unauthenticated) {
-        if (state.fullPath != '/role-selection' && 
-            state.fullPath != '/teacher-onboarding' && 
-            state.fullPath != '/parent-onboarding') {
+        final publicRoutes = ['/role-selection', '/teacher-onboarding', '/parent-onboarding'];
+        if (!publicRoutes.contains(state.fullPath)) {
+          print('Redirecting to role selection');
           return '/role-selection';
         }
       }
       
+      // Tidak perlu redirect
       return null;
     },
     routes: [

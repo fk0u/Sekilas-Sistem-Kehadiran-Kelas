@@ -54,6 +54,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
     print('User is logged in - Role: $userRole, School: $schoolName');
     
     if (userRole != null && schoolName != null) {
+      // Pastikan data yang diperlukan sesuai peran pengguna tersedia
+      if (userRole == 'guru') {
+        final teacherData = _storage.getTeacherData();
+        if (teacherData == null || teacherData.isEmpty) {
+          print('Teacher data is missing, logging out');
+          await logout();
+          return;
+        }
+      } else if (userRole == 'orangTua') {
+        final parentData = _storage.getParentData();
+        if (parentData == null || parentData.isEmpty) {
+          print('Parent data is missing, logging out');
+          await logout();
+          return;
+        }
+      }
+      
+      // Set state to authenticated with the appropriate role
       state = AuthState(
         status: AuthStatus.authenticated,
         userRole: userRole,
@@ -95,9 +113,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
+    print('Logging out user');
     await _storage.clearAll();
     
+    // Pastikan state diperbarui ke unauthenticated
     state = AuthState(status: AuthStatus.unauthenticated);
+    print('User logged out successfully');
   }
 }
 
